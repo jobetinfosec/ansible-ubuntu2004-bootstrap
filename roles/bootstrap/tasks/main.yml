@@ -196,23 +196,4 @@
       alias nanobash='nano ~/.bashrc'
       alias sourcebash='source ~/.bashrc'
       alias catpasswd='sudo cat /etc/passwd | column -t -s :'
-      ## SSH ##
-      alias confssh='sudo nano /etc/ssh/sshd_config'
-      alias resssh='sudo systemctl restart sshd'
-      alias statssh='sudo systemctl status sshd'
-      ## NGINX ##
-      alias confnginx='sudo nano /etc/nginx/nginx.conf'
-      alias resnginx='sudo systemctl restart nginx'
-      alias statnginx='sudo systemctl status nginx'
-      ## MARIADB ##
-      alias resmaria='sudo systemctl restart mariadb'
-      alias statmaria='sudo systemctl status mariadb'
-      ## PHP-FPM ##
-      alias conffpm='sudo nano /etc/php/7.4/fpm/php-fpm.conf'
-      alias resfpm='sudo systemctl restart php7.4-fpm'
-      alias statfpm='sudo systemctl status php7.4-fpm'
-
-
-
-
 
