@@ -1,0 +1,8 @@
+---
+user_name: <USER_NAME>
+ssh_public_key: "{{ lookup('file', '~/.ssh/<SSH_PUBLIC_KEY>') }}"
+custom_ssh_port: "<CUSTOM_SSH_PORT>"
+host_name: "<HOST_NAME>"
+server_ip: "<SERVER_IP>"
+domain_name: "<DOMAIN_NAME>"
+timezone: "<TIMEZONE>"

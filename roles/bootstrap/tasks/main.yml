@@ -1,0 +1,218 @@
+---
+# System update
+
+- name: Update packages cache
+  apt:
+    update_cache: yes
+
+- name: Upgrade packages
+  apt:
+    upgrade: dist
+
+- name: Remove dependencies that are no longer required
+  apt:
+    autoremove: yes
+
+- name: Remove useless packages from the cache
+  apt:
+    autoclean: yes
+
+# Check if server needs to be rebooted
+
+- name: Check if reboot is required
+  stat:
+    path: /var/run/reboot-required
+  register: reboot_required_file
+
+- name: Restart machine
+  reboot:
+    msg: "Reboot initiated by Ansible"
+  when: reboot_required_file.stat.exists == true
+
+- name: Waiting for server to come back after reboot
+  wait_for_connection:
+    connect_timeout: 300
+    delay: 10
+  register: reboot_result
+  when: reboot_required_file.stat.exists == true
+
+- name: Reboot time
+  debug:
+    msg: "The system rebooted in {{ reboot_result.elapsed }} seconds."
+  when: reboot_required_file.stat.exists == true
+
+# Create sudo admin, add ssh public key and set no password for sudo user
+
+- name: Create sudo user
+  user:
+    name: "{{ user_name }}"
+    password: "{{ password }}"
+    shell: /bin/bash
+    createhome: true
+    groups: sudo
+    append: yes
+
+- name: Add authorized keys
+  authorized_key:
+    user: "{{ user_name }}"
+    state: present
+    key: "{{ ssh_public_key }}"
+
+- name: Set no password for sudo user
+  lineinfile: "dest=/etc/sudoers line='{{ user_name }}    ALL=(ALL)    NOPASSWD: ALL'"
+
+# System settings
+
+- name: Set hostname
+  shell: hostnamectl set-hostname {{ host_name }}
+
+- name: Set FQDN
+  shell: echo "{{ server_ip }} {{ host_name }}.{{ domain_name }} {{ host_name }}" | tee -a /etc/hosts
+
+- name: Set timezone
+  timezone:
+    name: {{ timezone }}
+
+# Install utilities
+
+- name: Install utilities
+  apt:
+    pkg:
+     - tcpdump
+     - glances
+     - net-tools
+
+# SSH hardening
+
+- name: Create backup directory
+  file:
+    path: /etc/ssh/backup
+    state: directory
+
+- name: Config SSH host's keys
+  shell: mv ssh_host_* backup/
+  args:
+    chdir: /etc/ssh
+
+- name: Create new SSH host's keys
+  shell: dpkg-reconfigure openssh-server
+  notify: restart sshd
+
+- name: Change SSH port
+  lineinfile:
+    dest=/etc/ssh/sshd_config
+    regexp='^#Port\s'
+    line="Port {{ custom_ssh_port }}"
+    state=present
+  notify: restart sshd
+
+- name: Disable listening on IPv6 address
+  lineinfile:
+    dest=/etc/ssh/sshd_config
+    regexp='^#AddressFamily'
+    line="AddressFamily inet"
+    state=present
+  notify: restart sshd
+
+- name: Enable login grace time
+  lineinfile: 
+    dest: /etc/ssh/sshd_config
+    regexp: '^#LoginGraceTime' 
+    line: 'LoginGraceTime 20s'
+  notify: restart sshd
+
+- name: Disable remote root login
+  lineinfile: 
+    dest: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin' 
+    line: 'PermitRootLogin no'
+  notify: restart sshd
+
+- name: Enable MaxAuthTries
+  lineinfile: 
+    dest: /etc/ssh/sshd_config
+    regexp: '^#MaxAuthTries' 
+    line: 'MaxAuthTries 2'
+  notify: restart sshd
+
+- name: Disable empty password login
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^#?PermitEmptyPasswords' 
+    line: 'PermitEmptyPasswords no'
+  notify: restart sshd
+
+- name: Disable password login
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^#?PasswordAuthentication '
+    line: 'PasswordAuthentication no'
+  notify: restart sshd
+
+- name: Enable PrintMotd
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^PrintMotd'
+    line: 'PrintMotd yes'
+  notify: restart sshd
+
+- name: Enable PrintLastLog
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^#PrintLastLog'
+    line: 'PrintLastLog yes'
+  notify: restart sshd
+
+- name: Set ClientAliveInterval
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^#ClientAliveInterval'
+    line: 'ClientAliveInterval 300'
+  notify: restart sshd
+
+- name: Set ClientAliveCountMax
+  lineinfile: 
+    dest: /etc/ssh/sshd_config 
+    regexp: '^#ClientAliveCountMax'
+    line: 'ClientAliveCountMax 0'
+  notify: restart sshd
+
+# bashrc aliases
+
+- name: Add aliases to sudo user's bashrc file
+  blockinfile:
+    path: /home/{{ user_name }}/.bashrc
+    marker: "### {mark} CUSTOM ALIASES ###"
+    block: |
+      ## SYSTEM ##
+      alias update='sudo apt update && sudo apt dist-upgrade -y && sudo apt autoremove -y'
+      alias la='sudo ls -lah'
+      alias c='clear'
+      alias reb='sudo reboot'
+      alias po='sudo poweroff'
+      alias estab='sudo netstat -tuanp | grep ESTABLISHED'
+      alias listen='sudo netstat -tuanp | grep LISTEN'
+      alias mkpwd='sudo mkpasswd --method=sha-512'
+      alias nanobash='nano ~/.bashrc'
+      alias sourcebash='source ~/.bashrc'
+      alias catpasswd='sudo cat /etc/passwd | column -t -s :'
+      ## SSH ##
+      alias confssh='sudo nano /etc/ssh/sshd_config'
+      alias resssh='sudo systemctl restart sshd'
+      alias statssh='sudo systemctl status sshd'
+      ## NGINX ##
+      alias confnginx='sudo nano /etc/nginx/nginx.conf'
+      alias resnginx='sudo systemctl restart nginx'
+      alias statnginx='sudo systemctl status nginx'
+      ## MARIADB ##
+      alias resmaria='sudo systemctl restart mariadb'
+      alias statmaria='sudo systemctl status mariadb'
+      ## PHP-FPM ##
+      alias conffpm='sudo nano /etc/php/7.4/fpm/php-fpm.conf'
+      alias resfpm='sudo systemctl restart php7.4-fpm'
+      alias statfpm='sudo systemctl status php7.4-fpm'
+
+
+
+
+
