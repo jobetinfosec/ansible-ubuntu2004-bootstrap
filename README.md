@@ -20,6 +20,10 @@ The following Ansible playbook, will perform an initial system configuration of 
 * SSH hardening
 * Add aliases to .bashrc file
 
+## Ansible version
+
+2.9
+
 
 ## Tested on
 
@@ -33,7 +37,7 @@ b) An SSH key pair on your laptop or Ansible remote server, with the public key 
 d) Ansible already installed on your laptop or Ansible remote server
 
 
-## Instructions
+## Getting started
 
 a) On your laptop or Ansible remote server, create a working directory
 
